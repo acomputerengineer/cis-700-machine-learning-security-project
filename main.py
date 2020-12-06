@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[253]:
-
-
 import os
 import pandas as pd
 import numpy as np
@@ -38,15 +32,9 @@ import numpy as np
 from numpy.random import RandomState
 rng = RandomState()
 
-
-# In[ ]:
-
-
 def load_data():
+    print('Source: https://www.kaggle.com/mrisdal/fake-news')
     return pd.read_csv("data/fake.csv")
-
-
-# In[217]:
 
 
 def summarize_data(input_df):
@@ -54,66 +42,42 @@ def summarize_data(input_df):
 
     print('dataset shape is')
     print(input_df.shape)
-
-
-# In[219]:
-
-
-print('Columns Summary \n')
-
-cols = []
-for col in df.columns: 
-    cols.append([ col, df[ col ].dtypes])
     
-print(tabulate(cols, headers = [ 'column name', 'data type' ]))
+    print('Columns Summary \n')
+
+    cols = []
+    for col in df.columns: 
+        cols.append([ col, df[ col ].dtypes])
+
+    print(tabulate(cols, headers = [ 'column name', 'data type' ]))
+    
+    print('Column "type" value distribution\n')
+
+    vcp_type = df[ 'type' ].value_counts(normalize=True).to_frame('pct')
+    print(vcp_type)
+    print(vcp_type.plot.pie(y='pct', figsize=(7, 7)))
+    
+    print('Column "language" value distribution\n')
+
+    vcp_language = df[ 'language' ].value_counts(normalize=True).to_frame('pct')
+    print(vcp_language)
+    print(vcp_language.plot.pie(y='pct', figsize=(7, 7)))
+    
+    
+
+def strip_lang(df, lang, plot=False):
+    print('Start data cleaning')
+    print('Selecting '+lang+'\n')
+    df = df[df.language == lang]
 
 
-# In[220]:
-
-
-print('Column "type" value distribution\n')
-
-vcp = df[ 'type' ].value_counts(normalize=True).to_frame('pct')
-print(vcp)
-print(vcp.plot.pie(y='pct', figsize=(7, 7)))
-
-
-# In[221]:
-
-
-print('Column "language" value distribution\n')
-
-vcp = df[ 'language' ].value_counts(normalize=True).to_frame('pct')
-print(vcp)
-print(vcp.plot.pie(y='pct', figsize=(7, 7)))
-
-
-# In[222]:
-
-
-print('Start data cleaning')
-print('Selecting english\n')
-df = df[df.language == 'english']
-
-print('Column "language" value distribution english selection\n')
-
-vcp = df[ 'language' ].value_counts(normalize=True).to_frame('pct')
-print(vcp)
-print(vcp.plot.pie(y='pct', figsize=(7, 7)))
-
-
-# In[223]:
-
-
-print('Column "type" value distribution after non-english exclusion\n')
-
-vcp = df[ 'type' ].value_counts(normalize=True).to_frame('pct')
-print(vcp)
-print(vcp.plot.pie(y='pct', figsize=(7, 7)))
-
-
-# In[224]:
-
+    if plot:
+        print('Column "language" value distribution english selection\n')
+        vcp = df[ 'language' ].value_counts(normalize=True).to_frame('pct')
+        print(vcp)
+        print(vcp.plot.pie(y='pct', figsize=(7, 7)))
+    
+    return df
 
 def getCleanData(df, force=False):
     # NOTICE: This takes several mins to run due to fillna
@@ -162,20 +126,6 @@ def getCleanData(df, force=False):
     print('returning')
     return pd.read_csv("caches/cleaned.csv")
 
-
-# In[225]:
-
-
-cleandf = getCleanData(df, force=False)
-# cleandf.rename(columns = {'Unnamed: 0':'id'}, inplace = True)
-cleandf = cleandf.drop('Unnamed: 0', axis=1)
-
-print(cleandf['target'].value_counts())
-
-
-# In[226]:
-
-
 def split_x_y(df, target):
     try:
         y = df[ target ]
@@ -184,9 +134,6 @@ def split_x_y(df, target):
         print('Error split_x_y')
         print (str(e))
     return X, y
-
-
-# In[227]:
 
 
 # Under sample bc the dataset is wildly skewed
@@ -207,26 +154,38 @@ def resample(df):
     
     return X_under_sample
 
-cleandf = resample(cleandf)
-
-print(cleandf.describe())
-print(cleandf['target'].value_counts())
-
-
-# In[228]:
-
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+
+from sklearn.cluster import KMeans
+
+def kmeans(input_df, vec, terms, k=2):
+    model = KMeans(n_clusters=k, init='k-means++', max_iter=100, n_init=1)
+    model.fit(vec)
+    
+    sum_of_squared_distances = []
+    K = range(1, 50)
+    for k in K:
+        km = KMeans(n_clusters=k, init='k-means++', max_iter=100, n_init=1)
+        km = km.fit(vec)
+        sum_of_squared_distances.append(km.inertia_)
+        
+    plt.plot(K, sum_of_squared_distances, 'bx-')
+    plt.xlabel('k')
+    plt.ylabel('sum of squared distances')
+    plt.show()
+
+    return
 
 # Input: dataframe, field name, vector type [ count_vector || tfidf ]
 # Output: dataframe
 # Description: Inplace adds an encoding field for the passed field
-def vectorize(input_df, field, vecType, top=10):
+def vectorize(input_df, field, vecType, top=10, run_kmeans=False):
     text = input_df[ field ].values.astype('U')
     if vecType == 'count_vector':
-        vectorizer = CountVectorizer(ngram_range = (3,4))
+        vectorizer = CountVectorizer(ngram_range = (2,2))
     elif vecType == 'tfidf':
-        vectorizer = TfidfVectorizer(ngram_range = (3,4), stop_words='english')
+        vectorizer = TfidfVectorizer(ngram_range = (2,2), stop_words='english')
     else:
         raise Exception("Type options: count_vector or tfifd") 
 
@@ -248,12 +207,14 @@ def vectorize(input_df, field, vecType, top=10):
 
     input_df[ name ] = ''    
     input_df[ name ] = scores
+    
+    if run_kmeans:
+        print('Running kmeans')
+        kmeans(input_df, vector, features, 5)
+    else:
+        print('Bypass kmeans for speed')
 
     return input_df
-
-
-# In[252]:
-
 
 def text_vectorize(input_df):
     vectorize(input_df, 'title', 'tfidf')
@@ -262,66 +223,11 @@ def text_vectorize(input_df):
 
 # TODO: Cache this
 
-text_vectorize(cleandf)
 
-
-# In[230]:
-
-
-print(cleandf.shape)
-
-
-# In[231]:
-
-
-print(cleandf.describe())
-
-
-# In[232]:
-
-
-print(cleandf[ 'target' ].value_counts())
-
-
-# In[233]:
-
-
-plt.figure(figsize=(20,6))
-print(sns.heatmap(cleandf.corr(method='pearson'), annot=True, cmap = 'viridis'))
-
-
-# In[234]:
-
-
-
-plt.figure(figsize=(20,6))
-print(sns.heatmap(cleandf.corr(method='kendall'), annot=True, cmap = 'viridis'))
-
-
-# In[235]:
-
-
-
-plt.figure(figsize=(20,6))
-
-
-print(sns.heatmap(cleandf.corr(method='spearman'), annot=True, cmap = 'viridis'))
-
-
-# In[251]:
-
-
-columns = ['domain_rank', 'site_url_length', 'img_url_length', 'wordpress',
-       'img_query', 'target' ]
-print(cleandf.columns)
-
-print(cleandf['site_url_length'].value_counts())
-
-selected = cleandf[ columns ]
-
-
-# In[237]:
-
+def correlation_matrix(input_df, type):
+    plt.figure(figsize=(20,6))
+    plt.title(type+" correlation", fontsize =20)
+    print(sns.heatmap(input_df.corr(method=type), annot=True, cmap = 'viridis'))
 
 from sklearn.feature_selection import SelectKBest
 from sklearn import preprocessing
@@ -343,44 +249,6 @@ def select_k_best_features(X, y, k=10):
     except Exception as e:
         print("error Feature Selection")
         print (str(e))
-
-X, y = split_x_y(selected, 'target')        
-        
-X, y = select_k_best_features(X, y, 100)
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=1)
-
-
-# In[238]:
-
-
-# test_data = pd.DataFrame()
-
-# test_data['titles_word_len'] = cleandf['titles_word_len']
-# test_data['author_word_len'] = cleandf['author_word_len']
-# test_data['text_word_len'] = cleandf['text_word_len']
-# test_data['title_wo_stopwords'] = cleandf['title_wo_stopwords']
-# test_data['author_wo_stopwords'] = cleandf['author_wo_stopwords']
-# test_data['text_wo_stopwords'] = cleandf['text_wo_stopwords']
-# test_data['site_url_length'] = cleandf['site_url_length']
-# test_data['img_url_length'] = cleandf['img_url_length']
-
-
-
-# y = cleandf[ "target" ]
-
-# print(cleandf)
-
-
-
-# print(X_train)
-# print(X_test)
-# print(Y_train.describe())
-# print(Y_test)
-
-
-# In[239]:
-
 
 # print('Train sentance embeddings')
 
@@ -410,40 +278,22 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random
 
 # print(len(X_test_embedds))
 
-
-# In[240]:
-
-
-# print(X_train_under)
-# print(X_train_under_embedds)
-
-
-# In[241]:
-
-
-def performance_info(classifier, Y_test, pred, name=False):
+def performance_info(classifier, X_test, y_test, pred, name=False):
     print('\n\n classifier: '+name+'\n')
     if name == 'linear_regression':
         return
     
-    score = metrics.accuracy_score(Y_test, pred,)
+    score = metrics.accuracy_score(y_test, pred,)
     print("accuracy:   %0.3f" % score)
 
-    conf_mat_gnb = metrics.confusion_matrix(Y_test, pred)
-#     print(conf_mat_gnb)
+    conf_mat_gnb = metrics.confusion_matrix(y_test, pred)
 
-    disp = metrics.plot_confusion_matrix(classifier, X_test, y_test,
-                                 cmap=plt.cm.Blues)
+    disp = metrics.plot_confusion_matrix(classifier, X_test, y_test, cmap=plt.cm.Blues)
     disp.ax_.set_title(name)
-
     
     print('confusion matrix:\n', disp.confusion_matrix)
 
-    print(metrics.classification_report(Y_test, pred, labels=np.unique(pred)))
-
-
-# In[242]:
-
+    print(metrics.classification_report(y_test, pred, labels=np.unique(pred)))
 
 import pickle
 
@@ -457,7 +307,7 @@ def build_model(model, X_train, y_train, X_test, y_test, save=False, name='test-
     
     print(y_test.value_counts())
     
-    performance_info(model, y_test, pred, name)
+    performance_info(model, X_test, y_test, pred, name)
     
 #     TODO: handle for save true but no or invalid name
     filename = 'models/'+name+'.pkl'
@@ -467,13 +317,6 @@ def build_model(model, X_train, y_train, X_test, y_test, save=False, name='test-
     print('Built model '+name)
     print("".join(["="]*50))
     return
-
-# rf = RandomForestClassifier(max_depth = 100, min_samples_split=2, n_estimators = 500, random_state = 1)
-# build_model(rf, X_train, y_train, True)
-
-
-# In[243]:
-
 
 # Set up modeling functions
 from sklearn.ensemble import RandomForestClassifier
@@ -689,38 +532,29 @@ def XGB_classifier(X, y, X_train=False, y_train=False, X_test=False, y_test=Fals
     except Exception as e:
         print('Error '+name)
         print (str(e))
+    
 
-
-# In[244]:
+    
 
 
 from sklearn import model_selection
 from sklearn.ensemble import VotingClassifier
 
 def voting_ensemble_classification(X, y, cl_random_forest, cl_gaussian_naive_bayes, cl_support_vector_machines, cl_linear_regression, cl_logistic_regression, cl_knn, cl_perceptron, cl_linear_discriminant_analysis, cl_ada_boost_classifier, cl_gradient_boosting_classifier, cl_xgb_classifier):
-    # missing 
-        # cl_linear_regression
     try:
         seed = 7
         kfold = KFold(n_splits=10, random_state=seed, shuffle=True)
 
-        # create the sub models
         estimators = []
-
         estimators.append(('logistic', cl_logistic_regression))
         estimators.append(('svc', cl_support_vector_machines))
         estimators.append(('knn', cl_knn))
         estimators.append(('gaussian', cl_gaussian_naive_bayes))
         estimators.append(('perceptron', cl_perceptron))
-#         estimators.append(('linearsvc', linearsvc))
-#         estimators.append(('sgd', sgd))
-#         estimators.append(('decisiontree', decisiontree))
         estimators.append(('randomforest', cl_random_forest))
         estimators.append(('clf', cl_linear_discriminant_analysis))
         estimators.append(('AB', cl_ada_boost_classifier))
-        
         estimators.append(('GBC', cl_gradient_boosting_classifier))
-#         estimators.append(('ETC', ETC))
         estimators.append(('xgbs', cl_xgb_classifier))
 
         # create the ensemble model
@@ -732,19 +566,8 @@ def voting_ensemble_classification(X, y, cl_random_forest, cl_gaussian_naive_bay
         print("error ensemble")
         print (str(e))
 
-
-# 0.9860332225913622
-
-# array([0.9833887 , 0.99003322, 0.98006645, 0.99335548, 0.98006645,
-#        0.97342193, 0.98333333, 0.99333333, 0.99      , 0.99333333])
-
-
-# In[245]:
-
-
 def model_evaluation(results_ensemble, results_random_forest, results_gaussian_naive_bayes, results_support_vector_machines, results_linear_regression, results_logistic_regression, results_KNN, results_perceptron, results_linear_discriminant_analysis, results_ada_boost_classifier, results_gradient_boosting_classifier, results_XGB_classifier):
     try:
-        #Model evaluation
         print("Model evaluation")
         models = pd.DataFrame({
         'Model': ['ensemble', 'random forest', 'gaussian naive bayes', 'support vector machines', 'linear regression', 'logistic regression', 'KNN', 'perceptron', 'linear discriminant analysis', 'ada boost classifier', 'gradient boosting classifier', 'XGB classifie',],
@@ -763,125 +586,66 @@ def model_evaluation(results_ensemble, results_random_forest, results_gaussian_n
             results_XGB_classifier.mean()
         ]})
         print(models.sort_values(by='Score', ascending=False))
-        #Model score
     except Exception as e:
         print("error Model evaluation")
         print (str(e))
 
-# Model evaluation
-#                            Model     Score
-# 10                 XGB classifie  0.996673
-# 0                  random forest  0.996341
-# 9   gradient boosting classifier  0.993014
-# 5                            KNN  0.989024
-# 8           ada boost classifier  0.965403
-# 7   linear discriminant analysis  0.719553
-# 1           gaussian naive bayes  0.667981
-# 4            logistic regression  0.655364
-# 2        support vector machines  0.644699
-# 6                     perceptron  0.539938
-# 3              linear regression  0.225436
+def classify(input_df, columns):
+    selected = input_df[ columns ]
+    X, y = split_x_y(selected, 'target')        
+    X, y = select_k_best_features(X, y, 100)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=1)
+    
+    run_classifiers(X, y, X_train, y_train, X_test, y_test, True, True)
 
-
-# In[246]:
-
+def correlate(input_df):
+    correlation_matrix(input_df, 'pearson')
+    correlation_matrix(input_df, 'kendall')
+    correlation_matrix(input_df, 'spearman')
 
 print('Run classifications')
 
-results_random_forest, cl_random_forest = random_forest(X, y, X_train, y_train, X_test, y_test, True, True)
-results_gaussian_naive_bayes, cl_gaussian_naive_bayes = gaussian_naive_bayes(X, y, X_train, y_train, X_test, y_test, True, True)
-results_support_vector_machines, cl_support_vector_machines = support_vector_machines(X, y, X_train, y_train, X_test, y_test, True, True)
-results_linear_regression, cl_linear_regression = linear_regression(X, y, X_train, y_train, X_test, y_test, True, True)
-results_logistic_regression, cl_logistic_regression = logistic_regression(X, y, X_train, y_train, X_test, y_test, True, True)
-results_KNN, cl_knn = KNN(X, y, X_train, y_train, X_test, y_test, True, True)
-results_perceptron, cl_perceptron = perceptron(X, y, X_train, y_train, X_test, y_test, True, True)
-results_linear_discriminant_analysis, cl_linear_discriminant_analysis = linear_discriminant_analysis(X, y, X_train, y_train, X_test, y_test, True, True)
-results_ada_boost_classifier, cl_ada_boost_classifier = ada_boost_classifier(X, y, X_train, y_train, X_test, y_test, True, True)
-results_gradient_boosting_classifier, cl_gradient_boosting_classifier = gradient_boosting_classifier(X, y, X_train, y_train, X_test, y_test, True, True)
-results_XGB_classifier, cl_xgb_classifier = XGB_classifier(X, y, X_train, y_train, X_test, y_test, True, True)
+def run_classifiers(X, y, X_train, y_train, X_test, y_test, build_model_ind, save_model):
+    results_random_forest, cl_random_forest = random_forest(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_gaussian_naive_bayes, cl_gaussian_naive_bayes = gaussian_naive_bayes(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_support_vector_machines, cl_support_vector_machines = support_vector_machines(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_linear_regression, cl_linear_regression = linear_regression(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_logistic_regression, cl_logistic_regression = logistic_regression(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_KNN, cl_knn = KNN(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_perceptron, cl_perceptron = perceptron(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_linear_discriminant_analysis, cl_linear_discriminant_analysis = linear_discriminant_analysis(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_ada_boost_classifier, cl_ada_boost_classifier = ada_boost_classifier(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_gradient_boosting_classifier, cl_gradient_boosting_classifier = gradient_boosting_classifier(X, y, X_train, y_train, X_test, y_test, True, True)
+    results_XGB_classifier, cl_xgb_classifier = XGB_classifier(X, y, X_train, y_train, X_test, y_test, True, True)
 
-results_ensemble = voting_ensemble_classification(X, y, cl_random_forest, cl_gaussian_naive_bayes, cl_support_vector_machines, cl_linear_regression, cl_logistic_regression, cl_knn, cl_perceptron, cl_linear_discriminant_analysis, cl_ada_boost_classifier, cl_gradient_boosting_classifier, cl_xgb_classifier)
+    results_ensemble = voting_ensemble_classification(X, y, cl_random_forest, cl_gaussian_naive_bayes, cl_support_vector_machines, cl_linear_regression, cl_logistic_regression, cl_knn, cl_perceptron, cl_linear_discriminant_analysis, cl_ada_boost_classifier, cl_gradient_boosting_classifier, cl_xgb_classifier)
 
-model_evaluation(results_ensemble, results_random_forest, results_gaussian_naive_bayes, results_support_vector_machines, results_linear_regression, results_logistic_regression, results_KNN, results_perceptron, results_linear_discriminant_analysis, results_ada_boost_classifier, results_gradient_boosting_classifier, results_XGB_classifier)
-
-# results_random_forest, cl_random_forest = random_forest(X, y)
-# results_gaussian_naive_bayes, cl_gaussian_naive_bayes = gaussian_naive_bayes(X, y)
-# results_support_vector_machines, cl_support_vector_machines = support_vector_machines(X, y)
-# results_linear_regression, cl_linear_regression = linear_regression(X, y)
-# results_logistic_regression, cl_logistic_regression = logistic_regression(X, y)
-# results_KNN, cl_knn = KNN(X, y)
-# results_perceptron, cl_perceptron = perceptron(X, y)
-# results_linear_discriminant_analysis, cl_linear_discriminant_analysis = linear_discriminant_analysis(X, y)
-# results_ada_boost_classifier, cl_ada_boost_classifier = ada_boost_classifier(X, y)
-# results_gradient_boosting_classifier, cl_gradient_boosting_classifier = gradient_boosting_classifier(X, y)
-# results_XGB_classifier, cl_xgb_classifier = XGB_classifier(X, y)
-
-# initial
-# Run classifications
-# Running Random Forest
-# Random Forest estimate accuracy 0.9604392317198528
-# Running Gaussian Naive Bayes
-# Gaussian Naive Bayes estimate accuracy 0.8711027568922306
-# Running Support Vector Machines
-# Support Vector Machines estimate accuracy 0.9013115738655394
-# Running Linear Regression
-# Linear Regression estimate accuracy 0.03227553195292534
-# Running Logistic Regression
-# Logistic Regression estimate accuracy 0.879164385618424
-# Running KNN
-# KNN estimate accuracy 0.8858305903006365
-# Running Perceprton
-# Perceprton estimate accuracy 0.7318553295681601
-# Running Linear Discriminant Analysis
-# Linear Discriminant Analysis estimate accuracy 0.879164385618424
-# Running Ada Boost Classifier
-# Ada Boost Classifier estimate accuracy 0.8795943776491921
-# Running Gradient Boosting Classifier
-# Gradient Boosting Classifier estimate accuracy 0.9253920515574651
-# Running XGBoost Classifier
-# XGBoost Classifier estimate accuracy 0.9594725292493906
-
-
-# all features w/ y
-# Run classifications
-# Running Random Forest
-# Random Forest estimate accuracy 0.9963410852713178
-# Running Gaussian Naive Bayes
-# Gaussian Naive Bayes estimate accuracy 0.6679811738648948
-# Running Support Vector Machines
-# Support Vector Machines estimate accuracy 0.6446987818383166
-# Running Linear Regression
-# Linear Regression estimate accuracy 0.2254357223925374
-# Running Logistic Regression
-# Logistic Regression estimate accuracy 0.6553643410852712
-# Running KNN
-# KNN estimate accuracy 0.9890243632336656
-# Running Perceprton
-# Perceprton estimate accuracy 0.5399379844961241
-# Running Linear Discriminant Analysis
-# Linear Discriminant Analysis estimate accuracy 0.7195526024363232
-# Running Ada Boost Classifier
-# Ada Boost Classifier estimate accuracy 0.9654031007751938
-# Running Gradient Boosting Classifier
-# Gradient Boosting Classifier estimate accuracy 0.9933466223698781
-# Running XGBoost Classifier
-# XGBoost Classifier estimate accuracy 0.9966733111849392
-
-
-# In[247]:
+    model_evaluation(results_ensemble, results_random_forest, results_gaussian_naive_bayes, results_support_vector_machines, results_linear_regression, results_logistic_regression, results_KNN, results_perceptron, results_linear_discriminant_analysis, results_ada_boost_classifier, results_gradient_boosting_classifier, results_XGB_classifier)
 
 
 df = load_data()
 
+summarize_data(df)
 
-# In[248]:
+df = strip_lang(df, 'english', plot=True)
 
+cleandf = getCleanData(df, force=False)
+cleandf = cleandf.drop('Unnamed: 0', axis=1)
 
+print(cleandf['target'].value_counts())
 
+cleandf = resample(cleandf)
+print(cleandf['target'].value_counts())
 
+text_vectorize(cleandf)
+print(cleandf[ 'target' ].value_counts())
 
-# In[249]:
+correlate(cleandf)
 
+print(cleandf.columns)
 
+metadata_features = ['domain_rank', 'site_url_length', 'img_url_length', 'wordpress', 'img_query', 'target' ]
+classify(cleandf, metadata_features)
 
-
+textdata_features = ['title', 'author', 'text', 'titles_word_len', 'author_word_len','text_word_len', 'target']
+classify(cleandf, textdata_features)
