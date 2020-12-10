@@ -1,40 +1,39 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[77]:
+
+
 import os
 import pandas as pd
 import numpy as np
 import re
 import nltk
+import time
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from tabulate import tabulate
-
 from collections import Counter
-
 from sklearn import metrics
-
-# Load the library with the CountVectorizer method
 from sklearn.feature_extraction.text import CountVectorizer
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-
 from sklearn.model_selection import train_test_split
-
 from nltk.corpus import stopwords
-
-
-from sentence_transformers import SentenceTransformer
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_val_score
 
+st = False
 
-import pandas as pd
-import numpy as np
-from numpy.random import RandomState
-rng = RandomState()
+
+# In[78]:
+
 
 def load_data():
     print('Source: https://www.kaggle.com/mrisdal/fake-news')
     return pd.read_csv("data/fake.csv")
+
+
+# In[79]:
 
 
 def summarize_data(input_df):
@@ -65,6 +64,10 @@ def summarize_data(input_df):
     
     
 
+
+# In[80]:
+
+
 def strip_lang(df, lang, plot=False):
     print('Start data cleaning')
     print('Selecting '+lang+'\n')
@@ -78,6 +81,10 @@ def strip_lang(df, lang, plot=False):
         print(vcp.plot.pie(y='pct', figsize=(7, 7)))
     
     return df
+
+
+# In[81]:
+
 
 def getCleanData(df, force=False):
     # NOTICE: This takes several mins to run due to fillna
@@ -126,6 +133,10 @@ def getCleanData(df, force=False):
     print('returning')
     return pd.read_csv("caches/cleaned.csv")
 
+
+# In[82]:
+
+
 def split_x_y(df, target):
     try:
         y = df[ target ]
@@ -134,6 +145,9 @@ def split_x_y(df, target):
         print('Error split_x_y')
         print (str(e))
     return X, y
+
+
+# In[83]:
 
 
 # Under sample bc the dataset is wildly skewed
@@ -153,6 +167,9 @@ def resample(df):
     X_under_sample['target'] = y_under_sample
     
     return X_under_sample
+
+
+# In[84]:
 
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -216,6 +233,10 @@ def vectorize(input_df, field, vecType, top=10, run_kmeans=False):
 
     return input_df
 
+
+# In[85]:
+
+
 def text_vectorize(input_df):
     vectorize(input_df, 'title', 'tfidf')
     vectorize(input_df, 'author', 'tfidf')
@@ -224,10 +245,17 @@ def text_vectorize(input_df):
 # TODO: Cache this
 
 
+# In[86]:
+
+
 def correlation_matrix(input_df, type):
     plt.figure(figsize=(20,6))
     plt.title(type+" correlation", fontsize =20)
     print(sns.heatmap(input_df.corr(method=type), annot=True, cmap = 'viridis'))
+
+
+# In[87]:
+
 
 from sklearn.feature_selection import SelectKBest
 from sklearn import preprocessing
@@ -250,33 +278,42 @@ def select_k_best_features(X, y, k=10):
         print("error Feature Selection")
         print (str(e))
 
-# print('Train sentance embeddings')
 
-# model = SentenceTransformer('bert-base-nli-mean-tokens')
+# In[88]:
 
-# if not os.path.exists("X_train_under_embedds.npy"):
-#     print("start build embedding training models")
-#     X_trainL = X_train_under.values.tolist()
-#     list_of_string = [''.join(str(element)) for element in X_trainL]
-#     X_train_under_embedds = model.encode(list_of_string)
-#     np.save('X_train_under_embedds.npy', X_train_under_embedds)
-#     print("end build embedding training models")
-# else:
-#     X_train_under_embedds = np.load('X_train_under_embedds.npy')
-    
-# print(len(X_train_under_embedds))
 
-# if not os.path.exists("X_test_embedds.npy"):
-#     print("start build embedding testing models")
-#     X_testL = X_test.values.tolist()
-#     list_of_stringTest = [''.join(str(element)) for element in X_testL]
-#     X_test_embedds = model.encode(list_of_stringTest)
-#     print("end build embedding testing models")
-#     np.save('X_test_embedds.npy', X_test_embedds)
-# else:
-#     X_test_embedds = np.load('X_test_embedds.npy')
+if st:
+    print('Train sentance embeddings')
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer('bert-base-nli-mean-tokens')
 
-# print(len(X_test_embedds))
+    if not os.path.exists("X_train_under_embedds.npy"):
+        print("start build embedding training models")
+        X_trainL = X_train_under.values.tolist()
+        list_of_string = [''.join(str(element)) for element in X_trainL]
+        X_train_under_embedds = model.encode(list_of_string)
+        np.save('X_train_under_embedds.npy', X_train_under_embedds)
+        print("end build embedding training models")
+    else:
+        X_train_under_embedds = np.load('X_train_under_embedds.npy')
+
+    print(len(X_train_under_embedds))
+
+    if not os.path.exists("X_test_embedds.npy"):
+        print("start build embedding testing models")
+        X_testL = X_test.values.tolist()
+        list_of_stringTest = [''.join(str(element)) for element in X_testL]
+        X_test_embedds = model.encode(list_of_stringTest)
+        print("end build embedding testing models")
+        np.save('X_test_embedds.npy', X_test_embedds)
+    else:
+        X_test_embedds = np.load('X_test_embedds.npy')
+
+    print(len(X_test_embedds))
+
+
+# In[89]:
+
 
 def performance_info(classifier, X_test, y_test, pred, name=False):
     print('\n\n classifier: '+name+'\n')
@@ -294,6 +331,10 @@ def performance_info(classifier, X_test, y_test, pred, name=False):
     print('confusion matrix:\n', disp.confusion_matrix)
 
     print(metrics.classification_report(y_test, pred, labels=np.unique(pred)))
+
+
+# In[90]:
+
 
 import pickle
 
@@ -318,6 +359,10 @@ def build_model(model, X_train, y_train, X_test, y_test, save=False, name='test-
     print("".join(["="]*50))
     return
 
+
+# In[91]:
+
+
 # Set up modeling functions
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import RepeatedStratifiedKFold
@@ -329,7 +374,10 @@ def random_forest(X, y, X_train=False, y_train=False, X_test=False, y_test=False
 #         cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         random_forest = RandomForestClassifier(max_depth = 100, min_samples_split=2, n_estimators = 500, random_state = 1)
+        start = time.perf_counter()
         results_randomforest = cross_val_score(random_forest, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_randomforest.mean())
 
         if build_model_ind:
@@ -350,7 +398,10 @@ def gaussian_naive_bayes(X, y, X_train=False, y_train=False, X_test=False, y_tes
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         gaussian = GaussianNB()
+        start = time.perf_counter()
         results_gaussian = cross_val_score(gaussian, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_gaussian.mean())
         
         if build_model_ind:
@@ -370,7 +421,10 @@ def support_vector_machines(X, y, X_train=False, y_train=False, X_test=False, y_
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
 #         svc = SVC(C=0.01, cache_size=200, class_weight=None, coef0=0.0, decision_function_shape='ovr', degree=3, gamma=1, kernel='linear', max_iter=-1, probability=False, random_state=None, shrinking=True, tol=0.001, verbose=False)
         svc = SVC(kernel='rbf', gamma='auto')
+        start = time.perf_counter()
         results_svc = cross_val_score(svc, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_svc.mean())
 
         if build_model_ind:
@@ -389,7 +443,10 @@ def linear_regression(X, y, X_train=False, y_train=False, X_test=False, y_test=F
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         lin_reg= LinearRegression()
+        start = time.perf_counter()
         results_linreg= cross_val_score(lin_reg, X, y, cv=cv)
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_linreg.mean())
 
         if build_model_ind:
@@ -408,7 +465,10 @@ def logistic_regression(X, y, X_train=False, y_train=False, X_test=False, y_test
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         logreg = LogisticRegression(solver='lbfgs', max_iter=10000)
+        start = time.perf_counter()
         results_logreg = cross_val_score(logreg, X, y, cv=cv,scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_logreg.mean())
 
         if build_model_ind:
@@ -427,7 +487,10 @@ def KNN(X, y, X_train=False, y_train=False, X_test=False, y_test=False, build_mo
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         knn = KNeighborsClassifier(n_neighbors = 3)
+        start = time.perf_counter()
         results_knn = cross_val_score(knn, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_knn.mean())
 
         if build_model_ind:
@@ -446,7 +509,10 @@ def perceptron(X, y, X_train=False, y_train=False, X_test=False, y_test=False, b
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         perceptron = Perceptron(max_iter=1000, tol=1e-3)
+        start = time.perf_counter()
         results_perceptron = cross_val_score(perceptron, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_perceptron.mean())
 
         if build_model_ind:
@@ -465,7 +531,10 @@ def linear_discriminant_analysis(X, y, X_train=False, y_train=False, X_test=Fals
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         clf = LinearDiscriminantAnalysis()
+        start = time.perf_counter()
         results_clf = cross_val_score(clf, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_clf.mean())
 
         if build_model_ind:
@@ -484,7 +553,10 @@ def ada_boost_classifier(X, y, X_train=False, y_train=False, X_test=False, y_tes
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         AB = AdaBoostClassifier()
+        start = time.perf_counter()
         results_AB = cross_val_score(AB, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_AB.mean())
 
         if build_model_ind:
@@ -503,7 +575,10 @@ def gradient_boosting_classifier(X, y, X_train=False, y_train=False, X_test=Fals
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         GBC = GradientBoostingClassifier()
+        start = time.perf_counter()
         results_GBC = cross_val_score(GBC, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_GBC.mean())
 
         if build_model_ind:
@@ -522,7 +597,10 @@ def XGB_classifier(X, y, X_train=False, y_train=False, X_test=False, y_test=Fals
     try:
         cv = KFold(n_splits=10, random_state=42, shuffle=True)
         xgbs = XGBClassifier(objective="binary:logistic", random_state=42)
+        start = time.perf_counter()
         results_xgbs = cross_val_score(xgbs, X, y, cv=cv, scoring='accuracy')
+        elapsed = time.perf_counter() - start
+        print("timing: "+name+" "+str(elapsed)+" seconds")
         print(name+' estimate accuracy',results_xgbs.mean())
 
         if build_model_ind:
@@ -535,6 +613,9 @@ def XGB_classifier(X, y, X_train=False, y_train=False, X_test=False, y_test=Fals
     
 
     
+
+
+# In[92]:
 
 
 from sklearn import model_selection
@@ -566,6 +647,10 @@ def voting_ensemble_classification(X, y, cl_random_forest, cl_gaussian_naive_bay
         print("error ensemble")
         print (str(e))
 
+
+# In[93]:
+
+
 def model_evaluation(results_ensemble, results_random_forest, results_gaussian_naive_bayes, results_support_vector_machines, results_linear_regression, results_logistic_regression, results_KNN, results_perceptron, results_linear_discriminant_analysis, results_ada_boost_classifier, results_gradient_boosting_classifier, results_XGB_classifier):
     try:
         print("Model evaluation")
@@ -590,6 +675,10 @@ def model_evaluation(results_ensemble, results_random_forest, results_gaussian_n
         print("error Model evaluation")
         print (str(e))
 
+
+# In[94]:
+
+
 def classify(input_df, columns):
     selected = input_df[ columns ]
     X, y = split_x_y(selected, 'target')        
@@ -598,10 +687,18 @@ def classify(input_df, columns):
     
     run_classifiers(X, y, X_train, y_train, X_test, y_test, True, True)
 
+
+# In[95]:
+
+
 def correlate(input_df):
     correlation_matrix(input_df, 'pearson')
     correlation_matrix(input_df, 'kendall')
     correlation_matrix(input_df, 'spearman')
+
+
+# In[96]:
+
 
 print('Run classifications')
 
@@ -623,11 +720,26 @@ def run_classifiers(X, y, X_train, y_train, X_test, y_test, build_model_ind, sav
     model_evaluation(results_ensemble, results_random_forest, results_gaussian_naive_bayes, results_support_vector_machines, results_linear_regression, results_logistic_regression, results_KNN, results_perceptron, results_linear_discriminant_analysis, results_ada_boost_classifier, results_gradient_boosting_classifier, results_XGB_classifier)
 
 
+# In[97]:
+
+
 df = load_data()
+
+
+# In[98]:
+
 
 summarize_data(df)
 
+
+# In[99]:
+
+
 df = strip_lang(df, 'english', plot=True)
+
+
+# In[100]:
+
 
 cleandf = getCleanData(df, force=False)
 cleandf = cleandf.drop('Unnamed: 0', axis=1)
@@ -640,12 +752,29 @@ print(cleandf['target'].value_counts())
 text_vectorize(cleandf)
 print(cleandf[ 'target' ].value_counts())
 
+
+# In[101]:
+
+
 correlate(cleandf)
 
+
+# In[102]:
+
+
 print(cleandf.columns)
+
+
+# In[103]:
+
 
 metadata_features = ['domain_rank', 'site_url_length', 'img_url_length', 'wordpress', 'img_query', 'target' ]
 classify(cleandf, metadata_features)
 
+
+# In[104]:
+
+
 textdata_features = ['title', 'author', 'text', 'titles_word_len', 'author_word_len','text_word_len', 'target']
 classify(cleandf, textdata_features)
+
